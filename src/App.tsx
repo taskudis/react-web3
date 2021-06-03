@@ -9,14 +9,17 @@ import Column from './components/Column';
 import Header from './components/Header';
 import Loader from './components/Loader';
 import ConnectButton from './components/ConnectButton';
-import CurrentLeader from './components/CurrentLeader';
-import StateResultSubmitter from './components/StateResultsSubmitter';
+import BookInteracter from './components/BookInteracter';
+import BookList from './components/BookList';
 
 import { Web3Provider } from '@ethersproject/providers';
 import { getChainData } from './helpers/utilities';
-import { US_ELECTION_ADDRESS } from './constants';
-import US_ELECTION from './constants/abis/USElection.json';
+import { BOOK_LIBRARY_ADDRESS } from './constants';
+import BOOK_LIBRARY from './constants/abis/BookLibrary.json';
 import { getContract } from './helpers/ethers';
+
+// - Have a UI to create book, rent a book, return a book, see books available and their copies
+// - Handle errors and faulty transactions (error handling)
 
 const SLayout = styled.div`
   position: relative;
@@ -58,16 +61,15 @@ interface IAppState {
   chainId: number;
   pendingRequest: boolean;
   result: any | null;
-  electionContract: any | null;
+  booksContract: any | null;
   info: any | null;
   currentLeader: string;
   transactionHash: string;
-  bidenCode: number;
-  trumpCode: number,
-  bidenSeats: number,
-  trumpSeats: number,
-  electionEnded: boolean,
-  transactionError: string
+  transactionError: string,
+  transactionSuccess: string,
+  returnBookName: string,
+  returnBookCount: string,
+  books: any,
 }
 
 const INITIAL_STATE: IAppState = {
@@ -78,16 +80,15 @@ const INITIAL_STATE: IAppState = {
   chainId: 1,
   pendingRequest: false,
   result: null,
-  electionContract: null,
+  booksContract: null,
   info: null,
   currentLeader: '',
   transactionHash: '',
-  bidenCode: 0,
-  trumpCode: 0,
-  bidenSeats: 0,
-  trumpSeats: 0,
-  electionEnded: false,
-  transactionError: ''
+  transactionError: '',
+  transactionSuccess: '',
+  returnBookName: '',
+  returnBookCount: '',
+  books: []
 };
 
 class App extends React.Component<any, any> {
@@ -134,10 +135,7 @@ class App extends React.Component<any, any> {
 
     await this.subscribeToProviderEvents(this.provider);
 
-    const electionContract = getContract(US_ELECTION_ADDRESS, US_ELECTION.abi, library, address);
-
-    const bidenCode = await electionContract.BIDEN();
-    const trumpCode = await electionContract.TRUMP();
+    const booksContract = getContract(BOOK_LIBRARY_ADDRESS, BOOK_LIBRARY.abi, library, address);
 
     await this.setState({
       provider: this.provider,
@@ -145,22 +143,8 @@ class App extends React.Component<any, any> {
       chainId: network.chainId,
       address,
       connected: true,
-      electionContract,
-      bidenCode,
-      trumpCode
+      booksContract
     });
-
-    const bidenSeats = await this.getSeats(bidenCode);
-    const trumpSeats = await this.getSeats(trumpCode);
-    const electionStatus = await this.getElectionStatus();
-
-    await this.setState({
-      bidenSeats,
-      trumpSeats,
-      electionEnded: electionStatus
-    });
-
-    await this.currentLeader();
   };
 
   public subscribeToProviderEvents = async (provider:any) => {
@@ -232,80 +216,97 @@ class App extends React.Component<any, any> {
 
   };
 
-  public currentLeader = async () => {
-    const { electionContract } = this.state;
-
-    const currentLeader = await electionContract.currentLeader();
-
-    await this.setState({ currentLeader });
-  };
-
-  public submitElectionResult = async (data: string[]) => {
+  public addBook = async (name: string, count: string) => {
+    const { booksContract } = this.state;
 
     try {
-      const { electionContract, bidenCode, trumpCode } = this.state;
 
       await this.setState({ fetching: true });
-		  const transaction = await electionContract.submitStateResult(data);
+      const addBookT = await booksContract.addBook(name, count);
+      await this.setState({ transactionHash: addBookT.hash });
+      const addBookR = await addBookT.wait();
+      await this.setState({ fetching: false });
 
-		  await this.setState({ transactionHash: transaction.hash });
-
-      const transactionReceipt = await transaction.wait();
-      if (transactionReceipt.status !== 1) {
-        // React to failure
+      if (addBookR.status !== 1) {
+        // Error
       } else {
-        await this.currentLeader();
-        const bidenSeats = await this.getSeats(bidenCode);
-        const trumpSeats = await this.getSeats(trumpCode);
-
+        // TODO :: display the success message
         await this.setState({
-          bidenSeats,
-          trumpSeats
+          transactionSuccess: "Book Added !",
         });
-
-        await this.setState({ fetching: false });
       }
     } catch (e) {
-      // TODO:: Find a way to access that error and show it to the user
       await this.setState({
-        transactionError: "There was a transaction error durin the election results submit !",
-        fetching: false
+        transactionError: "There was an during book add !",
       });
     }
-  };
-
-
-  public getSeats = async (id: number) => {
-    try {
-      const { electionContract } = this.state;
-
-      const seats = await electionContract.seats(id);
-      return seats;
-    } catch(e) {
-      await this.setState({
-        transactionError: "There was an during getting the seats numbers !",
-      });
-    }
-
   }
 
-  public getElectionStatus = async () => {
-    const { electionContract } = this.state;
+  public returnBook = async (name: string, count: string) => {
+    const { booksContract } = this.state;
 
-    const status = await electionContract.electionEnded();
-    return status;
-  }
-
-  public endElection = async () => {
     try {
-      const { electionContract } = this.state;
-      await electionContract.endElection();
-    } catch(e) {
+      await this.setState({ fetching: true });
+      const returnBookT = await booksContract.returnBook(name, count);
+      await this.setState({ transactionHash: returnBookT.hash });
+      const addBookR = await returnBookT.wait();
+      await this.setState({ fetching: false });
+
+      if (addBookR.status !== 1) {
+        // Error
+      } else {
+        // TODO :: display the success message
+        await this.setState({
+          transactionSuccess: "Book Returned !",
+        });
+      }
+    } catch (e) {
       await this.setState({
-        transactionError: "There was an during ending the election !",
+        transactionError: "There was an during book return !",
       });
     }
+  }
 
+  public borrowBook = async (name: string) => {
+    // TODO:: this contract method doesnt work for some reason
+    const { booksContract } = this.state;
+
+    try {
+      await this.setState({ fetching: true });
+      const borrowBookT = await booksContract.borrowBook(name);
+      await this.setState({ transactionHash: borrowBookT.hash });
+      const borrowBookR = await borrowBookT.wait();
+      await this.setState({ fetching: false });
+
+      if (borrowBookR.status !== 1) {
+        // Error
+      } else {
+        // TODO :: display the success message
+        await this.setState({
+          transactionSuccess: "Book Borrowed !",
+        });
+      }
+    } catch (e) {
+      await this.setState({
+        transactionError: "There was an during book borrow !",
+      });
+    }
+  }
+
+  public listBooks = async () => {
+    const { booksContract } = this.state;
+
+    try {
+      const books = await booksContract.getAvailableBooks();
+      await this.setState({
+        transactionSuccess: "Books Listed !",
+        books
+      });
+    } catch (e) {
+      await this.setState({
+        transactionError: "There was an during book borrow !",
+      });
+    }
   }
 
   public render = () => {
@@ -314,20 +315,9 @@ class App extends React.Component<any, any> {
       connected,
       chainId,
       fetching,
-      currentLeader,
       transactionHash,
-      bidenCode,
-      trumpCode,
-      bidenSeats,
-      trumpSeats,
-      electionEnded,
-      transactionError
+      transactionError,
     } = this.state;
-
-    const leaderNames = {
-      [bidenCode]: "Biden",
-      [trumpCode]: "Trump"
-    };
 
     return (
       <SLayout>
@@ -348,17 +338,24 @@ class App extends React.Component<any, any> {
           />
             {connected ? (
               <>
-                <CurrentLeader
-                  leader={leaderNames[currentLeader]}
-                  bidenSeats={bidenSeats}
-                  trumpSeats={trumpSeats}
-                  electionStatus={electionEnded}
-                  endElection={this.endElection}
-                />
                 <p style={{color: 'red'}}>{transactionError}</p>
-                <StateResultSubmitter
-                  submitResult={this.submitElectionResult}
-                />
+                <BookInteracter
+                  submitResult={this.addBook}
+                  heading="Create a Book"
+                  />
+                <BookInteracter
+                  submitResult={this.returnBook}
+                  heading="Return a Book"
+                  />
+                <BookInteracter
+                  submitResult={this.borrowBook}
+                  heading="Borrow a Book"
+                  countInput={false}
+                  />
+                <BookList
+                  submitResult={this.listBooks}
+                  heading="List Available Books"
+                  />
               </>
             ): null}
             {!this.state.connected && (

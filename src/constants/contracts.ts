@@ -1,1 +1,1 @@
-export const US_ELECTION_ADDRESS = '0x261c58dEA18fE5658BC1e6F66Bd72DcC9725DCaf'; // Us election address on Ropsten
+export const BOOK_LIBRARY_ADDRESS = '0x9662496e354849EeB5195512725925a448d06571'; // Book Library address on Ropsten
