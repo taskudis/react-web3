@@ -1,1 +1,1 @@
-export const BOOK_LIBRARY_ADDRESS = '0x9662496e354849EeB5195512725925a448d06571'; // Book Library address on Ropsten
+export const BOOK_LIBRARY_ADDRESS = '0xA9ed5B2553543e409b8a1137D30DB5E25A13F7e6'; // Book Library address on Ropsten
