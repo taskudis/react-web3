@@ -1,1 +1,2 @@
-export const BOOK_LIBRARY_ADDRESS = '0xA9ed5B2553543e409b8a1137D30DB5E25A13F7e6'; // Book Library address on Ropsten
+export const BOOK_LIBRARY_ADDRESS = '0x7751C42a02fD78852c5BFe81975E2C8893685194'; // Book Library address on Rinkeby
+export const LIB_WRAPPER_ADDRESS = '0xA9ed5B2553543e409b8a1137D30DB5E25A13F7e6'; // LIBWrapper for Lib Token address on Rinkeby

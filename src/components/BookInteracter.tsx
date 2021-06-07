@@ -26,7 +26,7 @@ const BookInteracter = (props: IBookInteracterProps) => {
   const [validation, setValidation] = useState('');
 
   const onButtonClick = async () => {
-    if (!name || !count) {
+    if ((!name && nameInput) || (!count && countInput)) {
       return setValidation('Plese fill in all fields !');
     }
 
