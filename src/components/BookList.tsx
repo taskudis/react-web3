@@ -19,14 +19,24 @@ const SSectionWrapper = styled.div`
 `
 
 const BookReturner = (props: IBookListProps) => {
-  const { submitResult, heading  } = props;
-
+  const { submitResult, heading, books  } = props;
+  const bookElements = books.map((book, index) => {
+    return (
+          <li key={index}>
+            <h5>Book heading: {book.id}</h5>
+            <h6>Book count: {book.count}</h6>
+          </li>
+    )
+  })
   return (
     <>
       <SSectionWrapper>
         <div>
             <p>{heading}</p>
             <button onClick={submitResult}>Submit</button>
+            <ul>
+              {bookElements}
+            </ul>
         </div>
       </SSectionWrapper>
     </>

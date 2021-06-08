@@ -18,7 +18,7 @@ import { BOOK_LIBRARY_ADDRESS, LIB_WRAPPER_ADDRESS } from './constants';
 // ABI's
 import BOOK_LIBRARY from './constants/abis/BookLibrary.json';
 import LIB_WRAPPER from './constants/abis/LIBWrapper.json';
-import LIB_TOKEN from './constants/abis/LibToken.json';
+import LIB_TOKEN from './constants/abis/LIB.json';
 import { getContract, getParsedEther, getFormatedEther } from './helpers/ethers';
 import { ethers } from 'ethers';
 
@@ -78,7 +78,6 @@ interface IAppState {
   wrapperLIBamount: string,
   requestedLIBAmount: string,
   bookRentPrice: string,
-  a: string,
   libraryAllowance: string,
   contractRent: string,
   validAddresses: boolean,
@@ -109,7 +108,6 @@ const INITIAL_STATE: IAppState = {
   wrapperLIBamount: '',
   requestedLIBAmount: '',
   bookRentPrice: '1',
-  a: '',
   libraryAllowance: '',
   contractRent: '',
   validAddresses: true,
@@ -213,6 +211,16 @@ class App extends React.Component<any, any> {
     // signing
     // const { messageHash, signedMessage } = await this.signMessage('Hello');
     // await this.wrapWithSignedMessage(messageHash, signedMessage, address);
+
+    // borrow by signature
+    // const bookPrice = ethers.utils.parseEther("0.001").toString();
+    // const sig = await this.onAttemptToApprove();
+
+    // const nonce = await tokenContract.nonces(address);
+    // const verifyPermit = await tokenContract.checkPermit(address, BOOK_LIBRARY_ADDRESS, bookPrice, sig.deadline, sig.v, sig.r, sig.s, nonce);
+
+    // const borrowBookT = await booksContract.borrowBookBySignature('lord', bookPrice, sig.deadline, sig.v, sig.r, sig.s);
+    // await borrowBookT.wait();
   };
 
   // Event Handlers
@@ -264,6 +272,64 @@ class App extends React.Component<any, any> {
       signedMessage
     }
   }
+
+  public async onAttemptToApprove() {
+		const { tokenContract, address, library } = this.state;
+
+		const nonce = (await tokenContract.nonces(address)); // Our Token Contract Nonces
+    const deadline = + new Date() + 60 * 60; // Permit with deadline which the permit is valid
+    const wrapValue = ethers.utils.parseEther('0.001'); // Value to approve for the spender to use
+
+		const EIP712Domain = [ // array of objects -> properties from the contract and the types of them ircwithPermit
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
+        { name: 'verifyingContract', type: 'address' }
+    ];
+
+    const domain = {
+        name: await tokenContract.name(),
+        version: '1',
+        verifyingContract: tokenContract.address
+    };
+
+    const Permit = [ // array of objects -> properties from erc20withpermit
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'deadline', type: 'uint256' }
+    ];
+
+    const message = {
+        owner: address,
+        spender: BOOK_LIBRARY_ADDRESS,
+        value: wrapValue.toString(),
+        nonce: nonce.toHexString(),
+        deadline
+    };
+
+    const data = JSON.stringify({
+        types: {
+            EIP712Domain,
+            Permit
+        },
+        domain,
+        primaryType: 'Permit',
+        message
+    })
+
+    const signatureLike = await library.send('eth_signTypedData_v4', [address, data]);
+    const signature = await ethers.utils.splitSignature(signatureLike);
+
+    const preparedSignature = {
+        v: signature.v,
+        r: signature.r,
+        s: signature.s,
+        deadline
+    }
+
+    return preparedSignature
+}
 
   public async wrapWithSignedMessage(hashedMessage: string, signedMessage: string, receiver: string) {
     const { ethWrapperContract } = this.state;
@@ -400,7 +466,6 @@ class App extends React.Component<any, any> {
   }
 
   public borrowBook = async (name: string) => {
-    // TODO:: Use encodeFunctionData to manually encode and send transaction for borrowing a book.
     await this.approveRent();
 
     const { booksContract } = this.state;
@@ -430,16 +495,20 @@ class App extends React.Component<any, any> {
 
     try {
       await this.setState({ fetching: true });
-      const books = await booksContract.getAvailableBooks();
+      const books = await booksContract.getStoredBooks();
+      const booksPromises: any[] = books.map(async (name: string) => {
+        return await booksContract.getBook(name);
+      });
 
+      const booksData = await Promise.all(booksPromises);
       await this.setState({
         transactionSuccess: "Books Listed !",
-        books,
+        books: booksData,
         fetching: false
       });
     } catch (e) {
       await this.setState({
-        transactionError: "There was an during book borrow !",
+        transactionError: "There was an during book listing !",
       });
     }
   }
@@ -521,7 +590,8 @@ class App extends React.Component<any, any> {
       libraryAllowance,
       contractRent,
       validAddresses,
-      tokenContractAmount
+      tokenContractAmount,
+      books
     } = this.state;
 
     return (
@@ -578,6 +648,7 @@ class App extends React.Component<any, any> {
                 <BookList
                   submitResult={this.listBooks}
                   heading="List Available Books"
+                  books={books}
                   />
               </>
             ): null}
