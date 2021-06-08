@@ -208,6 +208,8 @@ class App extends React.Component<any, any> {
     );
     tokenContract.on(filterLibraryTransfer, this.handleTransferEvent);
 
+    await this.listBooks();
+
     // signing
     // const { messageHash, signedMessage } = await this.signMessage('Hello');
     // await this.wrapWithSignedMessage(messageHash, signedMessage, address);
@@ -423,6 +425,8 @@ class App extends React.Component<any, any> {
       const addBookT = await booksContract.addBook(name, count);
       await this.setState({ transactionHash: addBookT.hash });
       const addBookR = await addBookT.wait();
+      await this.listBooks();
+
       await this.setState({ fetching: false });
 
       if (addBookR.status !== 1) {
@@ -448,6 +452,7 @@ class App extends React.Component<any, any> {
       const returnBookT = await booksContract.returnBook(name, count);
       await this.setState({ transactionHash: returnBookT.hash });
       const addBookR = await returnBookT.wait();
+      await this.listBooks();
       await this.setState({ fetching: false });
 
       if (addBookR.status !== 1) {
@@ -475,6 +480,7 @@ class App extends React.Component<any, any> {
       const borrowBookT = await booksContract.borrowBook(name);
       await this.setState({ transactionHash: borrowBookT.hash });
       const borrowBookR = await borrowBookT.wait();
+      await this.listBooks();
       await this.setState({ fetching: false });
 
       if (borrowBookR.status !== 1) {
